@@ -1,87 +1,35 @@
 pipeline {
     agent any
-    
-    environment {
-        JAVA_HOME = '/usr/lib/jvm/java-21-amazon-corretto'
-        PATH = "/opt/maven/bin:$JAVA_HOME/bin:$PATH"
-        
-        // Nexus Configuration - Update with your EC2 IP
-        NEXUS_URL = "http://52.90.103.249:8081"
-        NEXUS_CREDENTIAL_ID = "nexus-credentials"
-        SONARQUBE_URL = "http://52.90.103.249:9000"
+
+    tools {
+        maven 'Maven'
+        jdk 'JDK21'
     }
-    
-    options {
-        skipStagesAfterUnstable()
-    }
-    
+
     stages {
         stage('Checkout') {
             steps {
                 git branch: 'master',
-                    url: 'https://github.com/skillupwithsachin/simple-java-maven-app.git'
-            }
-        }
-        
-        stage('Build') {
-            steps {
-                sh 'mvn -B -DskipTests clean package'
-            }
-        }
-        
-        stage('Test') {
-            steps {
-                sh 'mvn test'
-            }
-            post {
-                always {
-                    junit 'target/surefire-reports/*.xml'
-                }
+                    url: 'https://github.com/dhivya-1010/simple-java-maven-app.git'
             }
         }
 
-       stage('SonarQube Analysis') {
+        stage('Compile') {
             steps {
-                withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
-                    sh '''
-                        mvn sonar:sonar \
-                        -Dsonar.projectKey=simple-java-maven-app \
-                        -Dsonar.projectName='Simple Java Maven App' \
-                        -Dsonar.host.url=${SONARQUBE_URL} \
-                        -Dsonar.token=${SONAR_TOKEN}
-                    '''
-                }
+                bat 'mvn clean compile'
             }
         }
-        
-   stage('Upload to Nexus') {
+
+        stage('Test') {
             steps {
-                sh '''
-                    # Create Maven settings.xml with hardcoded Nexus credentials
-                    cat > settings.xml <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<settings>
-  <servers>
-    <server>
-      <id>nexus</id>
-      <username>admin</username>
-      <password>admin</password>
-    </server>
-  </servers>
-</settings>
-EOF
-                    
-                    # Deploy to Nexus
-                    mvn deploy -DskipTests -s settings.xml \
-                    -DaltDeploymentRepository=nexus::http://52.90.103.249:8081/repository/maven-snapshots/
-                '''
+                bat 'mvn test'
             }
         }
-        
-        stage('Deliver') { 
-            steps {
-                sh './jenkins/scripts/deliver.sh' 
-            }
+    }
+
+    post {
+        always {
+            echo 'Build and test process completed.'
         }
     }
 }
